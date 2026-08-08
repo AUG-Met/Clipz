@@ -14,7 +14,7 @@ use crate::ThemeSetting;
 /// diagnostics are visible even though a release build has no console.
 fn debug_log(line: &str) {
     if let Some(path) = std::env::temp_dir()
-        .join("clipboard-manager-debug.log")
+        .join("clipz-debug.log")
         .to_str()
         .map(String::from)
     {
@@ -38,11 +38,11 @@ pub fn get_history(
     db: State<'_, Arc<Mutex<Connection>>>,
     search_query: Option<String>,
 ) -> Result<Vec<HistoryItem>, String> {
-    println!("[clipboard-manager] get_history called, search_query: {:?}", search_query);
+    println!("[clipz] get_history called, search_query: {:?}", search_query);
     let conn = db.lock().map_err(|e| e.to_string())?;
     let result = db::get_history(&conn, search_query.as_deref()).map_err(|e| e.to_string());
     if let Ok(ref items) = result {
-        println!("[clipboard-manager] get_history returning {} items", items.len());
+        println!("[clipz] get_history returning {} items", items.len());
     }
     result
 }
@@ -84,7 +84,7 @@ pub fn get_settings(
     let conn = db.lock().map_err(|e| e.to_string())?;
     Ok(Settings {
         language: db::get_setting(&conn, "language", "zh"),
-        theme: db::get_setting(&conn, "theme", "dark"),
+        theme: db::get_setting(&conn, "theme", "system"),
         hotkey_modifier: db::get_setting(&conn, "hotkey_modifier", "ctrl"),
         hotkey_key: db::get_setting(&conn, "hotkey_key", "F1"),
         click_mode: db::get_setting(&conn, "click_mode", "1")
@@ -246,7 +246,7 @@ pub fn set_autostart(app: AppHandle, enabled: bool) -> Result<(), String> {
 
 /// Detect the Windows system theme (light/dark) by reading the registry.
 #[cfg(target_os = "windows")]
-fn read_system_theme() -> String {
+pub fn read_system_theme() -> String {
     use windows_sys::Win32::Foundation::ERROR_SUCCESS;
     use windows_sys::Win32::System::Registry::*;
     use std::ffi::OsString;

@@ -1,8 +1,8 @@
-# 剪贴板管理器 Clipboard Manager
+# Clipz
 
 [English version](README.en.md)
 
-Windows 剪贴板历史管理器，常驻系统托盘，自动记录剪贴板中的文本、文件和图片。基于 Tauri + Rust + React 重构，更轻量、更稳定。
+**Clipz** —— 轻量级的 Windows 剪贴板历史管理器。常驻系统托盘，自动记录剪贴板中的文本、文件和图片。基于 Tauri + Rust + React 构建，更轻量、更稳定。
 
 ## 功能
 
@@ -19,7 +19,7 @@ Windows 剪贴板历史管理器，常驻系统托盘，自动记录剪贴板中
 
 ## 使用说明
 
-1. 运行 `Clipboard Manager.exe`（安装后从开始菜单启动）
+1. 运行 `Clipz.exe`（安装后从开始菜单启动）
 2. 程序自动最小化到系统托盘
 3. 按 **Ctrl+F1** 唤出主界面
 4. 点击历史记录项复制内容（支持文本 / 文件 / 图片）
@@ -40,9 +40,9 @@ Windows 剪贴板历史管理器，常驻系统托盘，自动记录剪贴板中
 
 ## 下载
 
-从 [Releases](https://github.com/AUG-Met/clipboard-manager-tauri/releases) 下载最新版本安装包。
+从 [Releases](https://github.com/AUG-Met/Clipz/releases) 下载最新版本安装包。
 
-> 历史记录存储在 `%APPDATA%\com.clipboardmanager.app\clipboard.db`，卸载程序时请注意备份重要数据。
+> 历史记录存储在 `%APPDATA%\com.clipz.app\clipboard.db`，卸载程序时请注意备份重要数据。
 
 ## 开发环境
 

@@ -131,11 +131,16 @@ pub fn run() {
             // Apply stored theme to the Windows title bar.
             let theme = {
                 let conn = db.lock().unwrap();
-                db::get_setting(&conn, "theme", "light")
+                db::get_setting(&conn, "theme", "system")
             };
             app.manage(ThemeSetting(Arc::new(Mutex::new(theme.clone()))));
             if let Some(window) = app.get_webview_window("main") {
-                set_dark_title_bar(&window, theme == "dark");
+                let is_dark = if theme == "system" {
+                    commands::read_system_theme() == "dark"
+                } else {
+                    theme == "dark"
+                };
+                set_dark_title_bar(&window, is_dark);
             }
 
             // ---- system tray ----
@@ -209,7 +214,7 @@ fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     TrayIconBuilder::new()
         .icon(icon)
         .menu(&menu)
-        .tooltip("Clipboard Manager")
+        .tooltip("Clipz")
         .on_menu_event(|app, event| match event.id.as_ref() {
             "show_hide" => toggle_main_window(app),
             "quit" => {

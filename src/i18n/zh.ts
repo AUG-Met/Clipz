@@ -1,5 +1,5 @@
 const zh = {
-  app_title: "剪贴板管理器",
+  app_title: "Clipz",
   search_placeholder: "搜索历史记录...",
   history_title: "历史记录",
   preview_title: "内容",
@@ -48,8 +48,8 @@ const zh = {
   ql_text_not_supported: "文本内容不支持 QuickLook 预览，请直接查看",
   ql_not_found: "未找到 QuickLook，请先安装 QuickLook",
   ql_preview_error: "QuickLook 预览失败",
-  about_title: "关于剪贴板管理器",
-  about_version: "版本: v1.2",
+  about_title: "关于 Clipz",
+  about_version: "版本: v1.0.0",
   about_desc: "Windows 剪贴板历史管理器\n支持文本、文件、图片的历史记录\n全局热键唤出，快速复制粘贴",
   about_author: "作者: AUG-Met",
   about_repo: "GitHub 仓库",

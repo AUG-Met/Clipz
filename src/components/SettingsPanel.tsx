@@ -174,7 +174,7 @@ export function SettingsPanel({ settings: initial, onSave, onBack }: Props) {
             <div className="desc">{t("about_desc")}</div>
             <div className="author">{t("about_author")}</div>
             <div style={{ marginTop: 16 }}>
-              <a href="https://github.com/AUG-Met/clipboard_manager" target="_blank" rel="noreferrer">
+              <a href="https://github.com/AUG-Met/Clipz" target="_blank" rel="noreferrer">
                 {t("about_repo")}
               </a>
             </div>

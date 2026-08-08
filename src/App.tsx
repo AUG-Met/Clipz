@@ -19,7 +19,7 @@ function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [settings, setSettings] = useState<AppSettings>({
     language: "zh",
-    theme: "light",
+    theme: "system",
     hotkey_modifier: "ctrl",
     hotkey_key: "F1",
     click_mode: 1,

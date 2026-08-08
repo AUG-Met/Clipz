@@ -1,8 +1,8 @@
-# Clipboard Manager
+# Clipz
 
 [中文版](README.md)
 
-Windows clipboard history manager that lives in the system tray, automatically recording text, files, and images from the clipboard. Rebuilt with Tauri + Rust + React for a lighter, more stable experience.
+**Clipz** — A lightweight Windows clipboard history manager that lives in the system tray. Automatically records text, files, and images from the clipboard. Built with Tauri + Rust + React.
 
 ## Features
 
@@ -19,7 +19,7 @@ Windows clipboard history manager that lives in the system tray, automatically r
 
 ## Usage
 
-1. Run `Clipboard Manager.exe` (from the Start menu after installation)
+1. Run `Clipz.exe` (from the Start menu after installation)
 2. The app automatically minimizes to the system tray
 3. Press **Ctrl+F1** to show the main window
 4. Click a history item to copy its content (text / file / image)
@@ -40,9 +40,9 @@ Click the **⚙ Settings** button at the bottom:
 
 ## Download
 
-Download the latest release from [Releases](https://github.com/AUG-Met/clipboard-manager-tauri/releases).
+Download the latest release from [Releases](https://github.com/AUG-Met/Clipz/releases).
 
-> Clipboard history is stored at `%APPDATA%\com.clipboardmanager.app\clipboard.db`. Please back up important data before uninstalling.
+> Clipboard history is stored at `%APPDATA%\com.clipz.app\clipboard.db`. Please back up important data before uninstalling.
 
 ## Development
 

@@ -1,5 +1,5 @@
 const en: Record<string, string> = {
-  app_title: "Clipboard Manager",
+  app_title: "Clipz",
   search_placeholder: "Search history...",
   history_title: "History",
   preview_title: "Content",
@@ -48,8 +48,8 @@ const en: Record<string, string> = {
   ql_text_not_supported: "QuickLook only previews files. Text content is shown directly.",
   ql_not_found: "QuickLook not found. Please install QuickLook first.",
   ql_preview_error: "QuickLook preview failed",
-  about_title: "About Clipboard Manager",
-  about_version: "Version: v1.2",
+  about_title: "About Clipz",
+  about_version: "Version: v1.0.0",
   about_desc: "Windows Clipboard History Manager\nSupports text, files, and images history\nGlobal hotkey for quick access",
   about_author: "Author: AUG-Met",
   about_repo: "GitHub Repository",
