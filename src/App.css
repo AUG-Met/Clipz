@@ -378,6 +378,23 @@ html, body, #root {
   margin: 0;
 }
 
+.settings-row .external-link {
+  font-size: 14px;
+  color: var(--accent);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.settings-row .external-link:hover {
+  text-decoration: underline;
+}
+
+.settings-row .plain-text {
+  font-size: 14px;
+  color: inherit;
+  cursor: default;
+}
+
 .settings-row label {
   font-size: 14px;
 }

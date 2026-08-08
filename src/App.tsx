@@ -84,10 +84,10 @@ function App() {
       unlistenFn = fn;
     });
 
-    // Fallback: refresh every 2 seconds in case the event is missed
+    // Fallback: refresh every 1 second in case the event is missed
     const interval = setInterval(() => {
       loadHistory();
-    }, 2000);
+    }, 1000);
 
     // Listen for OS theme changes so "system" theme stays in sync.
     const media = window.matchMedia("(prefers-color-scheme: dark)");

@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.1 (2026-08-08)
+
+- 修复部分 Bug
+
 ## v1.0.0 (2026-08-08)
 
 **首个 Clipz 正式发布。** 基于 Tauri + Rust + React 的轻量级 Windows 剪贴板历史管理器。

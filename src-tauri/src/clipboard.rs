@@ -59,7 +59,7 @@ pub fn start_clipboard_monitor(
         let mut last_seq = clipboard_win::raw::seq_num().map(|s| s.get()).unwrap_or(0);
 
         loop {
-            thread::sleep(Duration::from_millis(500));
+            thread::sleep(Duration::from_millis(200));
 
             // On Windows, use the clipboard sequence number to detect any
             // clipboard change, even when the content is the same (e.g. user

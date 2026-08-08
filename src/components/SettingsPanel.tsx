@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { open } from "@tauri-apps/plugin-shell";
 import { AppSettings } from "../types";
 import { t } from "../i18n";
 
@@ -153,7 +154,16 @@ export function SettingsPanel({ settings: initial, onSave, onBack }: Props) {
 
             <div className="settings-card">
               <div className="settings-row">
-                <h3>{t("settings_quicklook")}</h3>
+                <span>
+                  <a
+                    href="#"
+                    onClick={(e) => { e.preventDefault(); open("https://github.com/QL-Win/QuickLook"); }}
+                    className="external-link"
+                  >
+                    {t("settings_quicklook")}
+                  </a>
+                  <span className="plain-text">{t("settings_quicklook_suffix")}</span>
+                </span>
                 <label className="toggle">
                   <input
                     type="checkbox"
@@ -174,7 +184,11 @@ export function SettingsPanel({ settings: initial, onSave, onBack }: Props) {
             <div className="desc">{t("about_desc")}</div>
             <div className="author">{t("about_author")}</div>
             <div style={{ marginTop: 16 }}>
-              <a href="https://github.com/AUG-Met/Clipz" target="_blank" rel="noreferrer">
+              <a
+                href="#"
+                onClick={(e) => { e.preventDefault(); open("https://github.com/AUG-Met/Clipz"); }}
+                className="external-link"
+              >
                 {t("about_repo")}
               </a>
             </div>
