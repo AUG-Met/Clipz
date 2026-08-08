@@ -1,0 +1,583 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+:root {
+  --bg: #ffffff;
+  --secondary-bg: #fafafa;
+  --card-bg: #ffffff;
+  --card-hover: #f5f5f5;
+  --card-selected: #e3f0ff;
+  --text-color: #333333;
+  --secondary-text: #aaaaaa;
+  --border: #e8e8e8;
+  --accent: #4A90D9;
+  --accent-hover: #3A7BC8;
+  --card-border: #e8e8e8;
+  --scrollbar-thumb: #c8c8c8;
+  --scrollbar-thumb-hover: #b0b0b0;
+  font-family: "Microsoft YaHei UI", "Segoe UI", sans-serif;
+  font-size: 14px;
+  color: var(--text-color);
+  background: var(--bg);
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --bg: #1e1e1e;
+  --secondary-bg: #252526;
+  --card-bg: #333333;
+  --card-hover: #3a3a3a;
+  --card-selected: #2a4a6a;
+  --text-color: #e0e0e0;
+  --secondary-text: #888888;
+  --border: #444444;
+  --accent: #4A90D9;
+  --accent-hover: #3A7BC8;
+  --card-border: #444444;
+  --scrollbar-thumb: #555555;
+  --scrollbar-thumb-hover: #666666;
+  color-scheme: dark;
+}
+
+/* Custom scrollbars that follow the theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Top Bar */
+.top-bar {
+  display: flex;
+  align-items: center;
+  height: 48px;
+  padding: 0 12px;
+  background: var(--secondary-bg);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.top-bar h1 {
+  font-size: 16px;
+  font-weight: bold;
+  margin-right: 8px;
+}
+
+.top-bar .hotkey-hint {
+  font-size: 11px;
+  color: var(--secondary-text);
+}
+
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.search-box input {
+  width: 200px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text-color);
+  font-size: 13px;
+  outline: none;
+}
+
+.search-box input:focus {
+  border-color: var(--accent);
+}
+
+/* Content Area */
+.content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Left Panel */
+.left-panel {
+  width: 260px;
+  min-width: 200px;
+  background: var(--secondary-bg);
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+}
+
+.left-panel h2 {
+  font-size: 13px;
+  padding: 10px 14px 6px;
+  color: #888;
+}
+
+.history-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.history-item {
+  padding: 6px 10px;
+  margin-bottom: 2px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1.4;
+  border: 1px solid transparent;
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+
+.history-item:hover {
+  background: var(--card-hover);
+}
+
+.history-item.selected {
+  background: var(--card-selected);
+  border-color: var(--accent);
+}
+
+.history-item .time {
+  font-size: 11px;
+  color: var(--secondary-text);
+  margin-left: 4px;
+}
+
+/* Right Panel */
+.right-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 16px;
+  overflow: hidden;
+}
+
+.right-panel .preview-title {
+  font-size: 13px;
+  font-weight: bold;
+  color: #888;
+  margin-bottom: 8px;
+}
+
+.right-panel .preview-content {
+  flex: 1;
+  background: var(--secondary-bg);
+  border-radius: 8px;
+  padding: 12px;
+  overflow-y: auto;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-family: inherit;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.right-panel .preview-content pre {
+  font-family: inherit;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* Editable text preview */
+.preview-editable {
+  outline: none;
+  cursor: text;
+  min-height: 60px;
+}
+
+/* File item group in preview: whole row highlights on hover */
+.preview-file-item {
+  padding: 4px 8px;
+  margin: 0 -8px;
+  border-radius: 6px;
+  cursor: context-menu;
+}
+
+.preview-file-item:hover {
+  background: var(--card-hover);
+}
+
+.right-panel .preview-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--secondary-text);
+  font-size: 14px;
+}
+
+/* Bottom Bar */
+.bottom-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 40px;
+  padding: 0 12px;
+  background: var(--secondary-bg);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.bottom-bar .count {
+  font-size: 12px;
+  color: var(--secondary-text);
+}
+
+.bottom-bar .actions {
+  display: flex;
+  gap: 4px;
+}
+
+.bottom-bar button {
+  padding: 4px 14px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  background: transparent;
+  color: var(--text-color);
+}
+
+.bottom-bar button:hover {
+  background: var(--card-hover);
+}
+
+.bottom-bar button.danger:hover {
+  background: #ffd5d5;
+  color: #cc4444;
+}
+
+/* Settings */
+.settings-overlay {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 12px;
+  background: var(--secondary-bg);
+  flex-shrink: 0;
+}
+
+.settings-header button {
+  padding: 4px 12px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  background: transparent;
+  color: var(--text-color);
+}
+
+.settings-header button:hover {
+  background: var(--card-hover);
+}
+
+.settings-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 16px 0;
+  flex-shrink: 0;
+}
+
+.settings-tab {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  background: transparent;
+  color: var(--secondary-text);
+  transition: all 0.2s;
+}
+
+.settings-tab:hover {
+  background: var(--card-hover);
+}
+
+.settings-tab.active {
+  background: var(--accent);
+  color: white;
+}
+
+.settings-content {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.settings-card {
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+
+.settings-card h3 {
+  font-size: 15px;
+  font-weight: bold;
+  margin-bottom: 2px;
+}
+
+.settings-card .desc {
+  font-size: 12px;
+  color: var(--secondary-text);
+  margin-bottom: 8px;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings-row h3 {
+  font-size: 14px;
+  font-weight: normal;
+  margin: 0;
+}
+
+.settings-row label {
+  font-size: 14px;
+}
+
+.settings-row select,
+.settings-row input {
+  width: 140px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--secondary-bg);
+  color: var(--text-color);
+  font-size: 13px;
+  outline: none;
+}
+
+.settings-row select:hover,
+.settings-row input:hover {
+  background: var(--card-hover);
+}
+
+.settings-row select:focus,
+.settings-row input:focus {
+  border-color: var(--accent);
+}
+
+/* Toggle Switch */
+.toggle {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  cursor: pointer;
+}
+
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle .slider {
+  position: absolute;
+  inset: 0;
+  background: #ccc;
+  border-radius: 24px;
+  transition: 0.3s;
+}
+
+.toggle .slider::before {
+  content: "";
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  left: 2px;
+  top: 2px;
+  background: white;
+  border-radius: 50%;
+  transition: 0.3s;
+}
+
+.toggle input:checked + .slider {
+  background: var(--accent);
+}
+
+.toggle input:checked + .slider::before {
+  transform: translateX(20px);
+}
+
+/* About */
+.about-card {
+  background: var(--secondary-bg);
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+}
+
+.about-card h2 {
+  font-size: 18px;
+  margin-bottom: 4px;
+}
+
+.about-card .version {
+  color: var(--secondary-text);
+  margin-bottom: 12px;
+}
+
+.about-card .desc {
+  font-size: 13px;
+  line-height: 1.6;
+  margin-bottom: 16px;
+  white-space: pre-wrap;
+}
+
+.about-card .author {
+  font-size: 12px;
+  color: var(--secondary-text);
+}
+
+.about-card a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.about-card a:hover {
+  text-decoration: underline;
+}
+
+/* Buttons */
+.btn {
+  padding: 6px 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  background: var(--accent);
+  color: white;
+}
+
+.btn:hover {
+  background: var(--accent-hover);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-color);
+}
+
+.btn-ghost:hover {
+  background: var(--card-hover);
+}
+
+/* Key capture */
+.key-capture-btn {
+  width: 80px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--secondary-bg);
+  color: var(--text-color);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.key-capture-btn:hover {
+  background: var(--card-hover);
+}
+
+/* Context menu */
+.context-menu {
+  position: fixed;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  z-index: 1000;
+  min-width: 140px;
+  overflow: hidden;
+}
+
+.context-menu button {
+  display: block;
+  width: 100%;
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  text-align: left;
+  color: var(--text-color);
+}
+
+.context-menu button:hover {
+  background: var(--card-hover);
+}
+
+.context-menu .separator {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #333;
+  color: white;
+  padding: 8px 24px;
+  border-radius: 8px;
+  font-size: 13px;
+  z-index: 9999;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+
+.toast.show {
+  opacity: 1;
+}

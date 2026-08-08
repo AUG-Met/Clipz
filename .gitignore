@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+target/
+
+# IDE
+.vs/
+.vscode/
+.idea/
+
+# OS
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Source backups (contain full source copies, not needed in repo)
+Backup/
+
+# Debug logs
+*.log
+
+# Rust build artifacts
+src-tauri/debug/
+src-tauri/target/
+
+# npm
+npm-debug.log*
