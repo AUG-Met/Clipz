@@ -1,5 +1,7 @@
-import { useState } from "react";
-import { open } from "@tauri-apps/plugin-shell";
+import { useState, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { open as openExternal } from "@tauri-apps/plugin-shell";
+import { open as openFile } from "@tauri-apps/plugin-dialog";
 import { AppSettings } from "../types";
 import { t } from "../i18n";
 
@@ -16,6 +18,10 @@ const MODIFIERS: Record<string, string> = {
   alt: "Alt",
   shift: "Shift",
   ctrl_shift: "Ctrl+Shift",
+  win: "Win",
+  ctrl_win: "Ctrl+Win",
+  alt_win: "Alt+Win",
+  shift_win: "Shift+Win",
 };
 
 const KEYS = ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12"];
@@ -24,6 +30,43 @@ export function SettingsPanel({ settings: initial, onSave, onBack }: Props) {
   const [tab, setTab] = useState<Tab>("appearance");
   const [settings, setSettings] = useState<AppSettings>(initial);
   const [capturingKey, setCapturingKey] = useState(false);
+  const [detecting, setDetecting] = useState(false);
+  const [qlNotFound, setQlNotFound] = useState(false);
+
+  // Auto-detect QuickLook path when the toggle is turned on and no path is set.
+  useEffect(() => {
+    if (settings.quicklook && !settings.quicklook_path) {
+      detectQuickLook();
+    }
+  }, [settings.quicklook]);
+
+  const detectQuickLook = () => {
+    setDetecting(true);
+    setQlNotFound(false);
+    invoke<string>("find_quicklook_path").then((path) => {
+      setDetecting(false);
+      if (path) {
+        update({ quicklook_path: path });
+      } else {
+        setQlNotFound(true);
+      }
+    }).catch(() => {
+      setDetecting(false);
+      setQlNotFound(true);
+    });
+  };
+
+  const browseQuickLook = async () => {
+    const selected = await openFile({
+      title: "Select QuickLook.exe",
+      filters: [{ name: "QuickLook", extensions: ["exe"] }],
+      multiple: false,
+    });
+    if (selected && typeof selected === "string") {
+      update({ quicklook_path: selected });
+      setQlNotFound(false);
+    }
+  };
 
   const update = (patch: Partial<AppSettings>) => {
     setSettings((prev) => ({ ...prev, ...patch }));
@@ -94,6 +137,21 @@ export function SettingsPanel({ settings: initial, onSave, onBack }: Props) {
                 </select>
               </div>
             </div>
+
+            <div className="settings-card">
+              <div className="settings-row">
+                <h3>{t("settings_auto_collapse")}</h3>
+                <label className="toggle">
+                  <input
+                    type="checkbox"
+                    checked={settings.auto_collapse}
+                    onChange={(e) => update({ auto_collapse: e.target.checked })}
+                  />
+                  <span className="slider" />
+                </label>
+              </div>
+              <div className="desc">{t("settings_auto_collapse_desc")}</div>
+            </div>
           </>
         )}
 
@@ -157,7 +215,7 @@ export function SettingsPanel({ settings: initial, onSave, onBack }: Props) {
                 <span>
                   <a
                     href="#"
-                    onClick={(e) => { e.preventDefault(); open("https://github.com/QL-Win/QuickLook"); }}
+                    onClick={(e) => { e.preventDefault(); openExternal("https://github.com/QL-Win/QuickLook"); }}
                     className="external-link"
                   >
                     {t("settings_quicklook")}
@@ -173,6 +231,28 @@ export function SettingsPanel({ settings: initial, onSave, onBack }: Props) {
                   <span className="slider" />
                 </label>
               </div>
+              {settings.quicklook && (
+                <div className="ql-path-row">
+                  <div className="ql-path-input-row">
+                    <input
+                      className="ql-path-input"
+                      type="text"
+                      value={settings.quicklook_path ?? ""}
+                      onChange={(e) => update({ quicklook_path: e.target.value || null })}
+                      placeholder={detecting ? t("settings_ql_path_detecting") : "QuickLook.exe"}
+                    />
+                    <button className="ql-browse-btn" onClick={browseQuickLook}>
+                      {t("settings_ql_path_browse")}
+                    </button>
+                    <button className="ql-browse-btn" onClick={detectQuickLook} disabled={detecting}>
+                      {t("settings_ql_path_detect")}
+                    </button>
+                  </div>
+                  {qlNotFound && !detecting && (
+                    <div className="ql-not-found-hint">{t("settings_ql_path_not_found")}</div>
+                  )}
+                </div>
+              )}
             </div>
           </>
         )}
@@ -186,7 +266,7 @@ export function SettingsPanel({ settings: initial, onSave, onBack }: Props) {
             <div style={{ marginTop: 16 }}>
               <a
                 href="#"
-                onClick={(e) => { e.preventDefault(); open("https://github.com/AUG-Met/Clipz"); }}
+                onClick={(e) => { e.preventDefault(); openExternal("https://github.com/AUG-Met/Clipz"); }}
                 className="external-link"
               >
                 {t("about_repo")}

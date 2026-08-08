@@ -88,12 +88,65 @@ html, body, #root {
 .top-bar h1 {
   font-size: 16px;
   font-weight: bold;
+  margin-right: 4px;
+}
+
+.topbar-settings-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0 6px;
   margin-right: 8px;
+  color: var(--secondary-text);
+  line-height: 1;
+}
+
+.topbar-settings-btn:hover {
+  color: var(--text-color);
 }
 
 .top-bar .hotkey-hint {
   font-size: 11px;
   color: var(--secondary-text);
+}
+
+/* Category Bar */
+.category-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 12px;
+  background: var(--secondary-bg);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  overflow-x: auto;
+}
+
+.category-bar::-webkit-scrollbar {
+  height: 0;
+}
+
+.category-tab {
+  padding: 4px 12px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+  background: transparent;
+  color: var(--secondary-text);
+  transition: all 0.15s;
+}
+
+.category-tab:hover {
+  background: var(--card-hover);
+  color: var(--text-color);
+}
+
+.category-tab.active {
+  background: var(--accent);
+  color: white;
 }
 
 
@@ -174,6 +227,73 @@ html, body, #root {
   font-size: 11px;
   color: var(--secondary-text);
   margin-left: 4px;
+}
+
+/* Group headers for auto-collapse */
+.history-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  margin: 4px 2px 2px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: bold;
+  color: var(--secondary-text);
+  background: var(--secondary-bg);
+  user-select: none;
+}
+
+.history-group-header:hover {
+  background: var(--card-hover);
+}
+
+.history-group-arrow {
+  font-size: 10px;
+  width: 14px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.history-group-label {
+  flex: 1;
+}
+
+.history-group-count {
+  font-size: 11px;
+  padding: 0 6px;
+  background: var(--border);
+  border-radius: 8px;
+  color: var(--secondary-text);
+}
+
+/* Link preview blocks */
+.preview-link-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.preview-link-item {
+  font-size: 14px;
+  font-weight: bold;
+  padding: 8px 10px;
+  background: var(--card-hover);
+  border-radius: 6px;
+  border-left: 3px solid var(--accent);
+  word-break: break-all;
+}
+
+.preview-link-source {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-color);
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 
 /* Right Panel */
@@ -395,6 +515,63 @@ html, body, #root {
   cursor: default;
 }
 
+/* QuickLook path row */
+.ql-path-row {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.ql-path-input-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.ql-path-input {
+  flex: 1;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--secondary-bg);
+  color: var(--text-color);
+  font-size: 12px;
+  outline: none;
+}
+
+.ql-path-input:focus {
+  border-color: var(--accent);
+}
+
+.ql-browse-btn {
+  flex-shrink: 0;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--secondary-bg);
+  color: var(--text-color);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ql-browse-btn:hover {
+  background: var(--card-hover);
+}
+
+.ql-browse-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ql-not-found-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #cc4444;
+}
+
 .settings-row label {
   font-size: 14px;
 }
@@ -576,6 +753,56 @@ html, body, #root {
   height: 1px;
   background: var(--border);
   margin: 4px 0;
+}
+
+/* Confirm overlay + dialog */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.confirm-dialog {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px 24px;
+  min-width: 300px;
+  max-width: 400px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.confirm-message {
+  font-size: 14px;
+  line-height: 1.5;
+  margin-bottom: 16px;
+  color: var(--text-color);
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.confirm-actions .btn-danger {
+  background: #cc4444;
+}
+
+.confirm-actions .btn-danger:hover {
+  background: #b33a3a;
+}
+
+.confirm-actions .btn-cancel {
+  background: #999;
+}
+
+.confirm-actions .btn-cancel:hover {
+  background: #888;
 }
 
 /* Toast */

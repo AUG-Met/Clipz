@@ -17,6 +17,11 @@ mod quicklook;
 /// change, so that `on_window_event` can re-apply it without a DB read.
 pub struct ThemeSetting(pub Arc<Mutex<String>>);
 
+/// Managed state: the currently registered global shortcut string.
+/// Used by `save_settings` to unregister the old shortcut before registering
+/// the new one.
+pub struct CurrentShortcut(pub Arc<Mutex<String>>);
+
 #[cfg(target_os = "windows")]
 #[link(name = "uxtheme")]
 extern "system" {
@@ -86,6 +91,7 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec!["--silent"]),
@@ -176,6 +182,7 @@ pub fn run() {
             commands::show_window,
             commands::copy_text,
             commands::copy_files,
+            commands::copy_file_as_new,
             commands::copy_image,
             commands::set_theme,
             commands::set_autostart,
@@ -183,6 +190,9 @@ pub fn run() {
             commands::quicklook_preview,
             commands::open_paths,
             commands::open_folder,
+            commands::find_quicklook_path,
+            commands::toggle_favorite,
+            commands::get_favorites,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -242,14 +252,39 @@ fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 // ---------------------------------------------------------------------------
 
 fn register_hotkey(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-    let shortcut_str = "Ctrl+F1";
-    app.global_shortcut().on_shortcut(shortcut_str, |app_handle, _, event| {
+    let db = app.state::<Arc<Mutex<rusqlite::Connection>>>();
+    let conn = db.lock().unwrap();
+    let modifier = db::get_setting(&conn, "hotkey_modifier", "ctrl");
+    let key = db::get_setting(&conn, "hotkey_key", "F1");
+    let shortcut_str = build_shortcut_str(&modifier, &key);
+    drop(conn);
+
+    app.global_shortcut().on_shortcut(shortcut_str.as_str(), |app_handle, _, event| {
         if event.state() == ShortcutState::Pressed {
             toggle_main_window(app_handle);
         }
     })?;
 
+    app.manage(CurrentShortcut(Arc::new(Mutex::new(shortcut_str))));
+
     Ok(())
+}
+
+/// Map a stored modifier string (e.g. "ctrl", "alt", "win", "ctrl_shift",
+/// "ctrl_win") plus a key into a Tauri global-shortcut accelerator.
+/// The Windows/Command key is spelled "Super" in the plugin's syntax.
+pub fn build_shortcut_str(modifier: &str, key: &str) -> String {
+    let mapped: Vec<String> = modifier
+        .split('_')
+        .map(|m| match m {
+            "ctrl" => "Ctrl".to_string(),
+            "alt" => "Alt".to_string(),
+            "shift" => "Shift".to_string(),
+            "win" => "Super".to_string(),
+            _ => m.to_string(),
+        })
+        .collect();
+    format!("{}+{}", mapped.join("+"), key)
 }
 
 // ---------------------------------------------------------------------------

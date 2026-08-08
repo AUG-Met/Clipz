@@ -28,6 +28,14 @@ pub fn init_db(db_path: &Path) -> Result<Connection> {
         CREATE TABLE IF NOT EXISTS settings (
             key   TEXT PRIMARY KEY,
             value TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS favorites (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            item_id    INTEGER NOT NULL,
+            file_path  TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+            UNIQUE(item_id, file_path)
         );",
     )?;
 
@@ -142,9 +150,14 @@ pub fn delete_item(conn: &Connection, id: i64) -> Result<()> {
     Ok(())
 }
 
-/// Delete all history items.
+/// Delete all history items, keeping any items that have been favorited.
+/// This lets "clear" remove non-favorites while the favorites collection
+/// (which references history rows) stays intact.
 pub fn clear_history(conn: &Connection) -> Result<()> {
-    conn.execute("DELETE FROM history", [])?;
+    conn.execute(
+        "DELETE FROM history WHERE id NOT IN (SELECT item_id FROM favorites)",
+        [],
+    )?;
     Ok(())
 }
 
@@ -169,6 +182,52 @@ pub fn set_setting(conn: &Connection, key: &str, value: &str) -> Result<()> {
         params![key, value],
     )?;
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Favorites
+// ---------------------------------------------------------------------------
+
+/// Toggle favorite status for an item (or a specific file within an item).
+/// Returns `true` if the item is now favorited, `false` if removed.
+pub fn toggle_favorite(
+    conn: &Connection,
+    item_id: i64,
+    file_path: Option<&str>,
+) -> Result<bool> {
+    let existing: Option<bool> = conn
+        .query_row(
+            "SELECT 1 FROM favorites WHERE item_id = ?1 AND ((?2 IS NULL AND file_path IS NULL) OR file_path = ?2)",
+            params![item_id, file_path],
+            |_| Ok(true),
+        )
+        .ok();
+
+    if existing.is_some() {
+        conn.execute(
+            "DELETE FROM favorites WHERE item_id = ?1 AND ((?2 IS NULL AND file_path IS NULL) OR file_path = ?2)",
+            params![item_id, file_path],
+        )?;
+        Ok(false)
+    } else {
+        conn.execute(
+            "INSERT INTO favorites (item_id, file_path) VALUES (?1, ?2)",
+            params![item_id, file_path],
+        )?;
+        Ok(true)
+    }
+}
+
+/// Get all favorites with their file_path info.
+pub fn get_all_favorites(conn: &Connection) -> Result<Vec<(i64, Option<String>)>> {
+    let mut stmt = conn.prepare("SELECT item_id, file_path FROM favorites ORDER BY id DESC")?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, Option<String>>(1)?))
+        })?
+        .filter_map(|r| r.ok())
+        .collect();
+    Ok(rows)
 }
 
 // ---------------------------------------------------------------------------

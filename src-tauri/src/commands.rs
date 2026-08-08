@@ -4,11 +4,13 @@ use md5::{Digest, Md5};
 use rusqlite::Connection;
 use tauri::{AppHandle, State, Window};
 use tauri_plugin_autostart::ManagerExt;
+use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
 use crate::db;
-use crate::models::{HistoryItem, Settings};
+use crate::models::{FavoriteEntry, HistoryItem, Settings};
 use crate::quicklook;
 use crate::ThemeSetting;
+use crate::CurrentShortcut;
 
 /// Append a line to a debug log file under the temp dir, so `open_folder`
 /// diagnostics are visible even though a release build has no console.
@@ -92,13 +94,20 @@ pub fn get_settings(
             .unwrap_or(1),
         autostart: db::get_setting(&conn, "autostart", "false") == "true",
         quicklook: db::get_setting(&conn, "quicklook", "false") == "true",
+        quicklook_path: {
+            let p = db::get_setting(&conn, "quicklook_path", "");
+            if p.is_empty() { None } else { Some(p) }
+        },
+        auto_collapse: db::get_setting(&conn, "auto_collapse", "true") == "true",
     })
 }
 
 #[tauri::command]
 pub fn save_settings(
     db: State<'_, Arc<Mutex<Connection>>>,
+    app: AppHandle,
     settings: Settings,
+    current_shortcut: State<'_, CurrentShortcut>,
 ) -> Result<(), String> {
     let conn = db.lock().map_err(|e| e.to_string())?;
     db::set_setting(&conn, "language", &settings.language).map_err(|e| e.to_string())?;
@@ -112,6 +121,29 @@ pub fn save_settings(
         .map_err(|e| e.to_string())?;
     db::set_setting(&conn, "quicklook", &settings.quicklook.to_string())
         .map_err(|e| e.to_string())?;
+    db::set_setting(
+        &conn,
+        "quicklook_path",
+        settings.quicklook_path.as_deref().unwrap_or(""),
+    )
+    .map_err(|e| e.to_string())?;
+    db::set_setting(&conn, "auto_collapse", &settings.auto_collapse.to_string())
+        .map_err(|e| e.to_string())?;
+    drop(conn);
+
+    // Re-register the global hotkey with the new modifier/key.
+    let new_shortcut = crate::build_shortcut_str(&settings.hotkey_modifier, &settings.hotkey_key);
+    let mut old = current_shortcut.0.lock().map_err(|e| e.to_string())?;
+    if *old != new_shortcut {
+        let _ = app.global_shortcut().unregister(old.as_str());
+        app.global_shortcut().on_shortcut(new_shortcut.as_str(), |app_handle, _, event| {
+            if event.state() == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                crate::toggle_main_window(app_handle);
+            }
+        }).map_err(|e| e.to_string())?;
+        *old = new_shortcut;
+    }
+
     Ok(())
 }
 
@@ -163,6 +195,35 @@ pub fn copy_files(
     let hash = format!("{:x}", Md5::digest(paths_json.as_bytes()));
     *suppressed_hash.lock().map_err(|e| e.to_string())? = Some(hash);
 
+    #[cfg(target_os = "windows")]
+    {
+        use clipboard_win::raw;
+        raw::open().map_err(|e| e.to_string())?;
+        let set_result = (|| {
+            raw::empty().map_err(|e| e.to_string())?;
+            raw::set_file_list(&paths).map_err(|e| e.to_string())?;
+            Ok::<(), String>(())
+        })();
+        let _ = raw::close();
+        set_result?;
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let mut cb = arboard::Clipboard::new().map_err(|e| e.to_string())?;
+        cb.set_text(paths.join("\n")).map_err(|e| e.to_string())?;
+    }
+
+    window.set_focus().map_err(|e| e.to_string())
+}
+
+/// Copy a list of file paths to the system clipboard WITHOUT suppressing the
+/// monitor, so the clipboard monitor detects the change and creates a new
+/// history entry. Used when "copy as new" is requested from the UI.
+#[tauri::command]
+pub fn copy_file_as_new(
+    window: Window,
+    paths: Vec<String>,
+) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         use clipboard_win::raw;
@@ -302,15 +363,55 @@ pub fn get_system_theme() -> String {
 // QuickLook command
 // ---------------------------------------------------------------------------
 
+/// Auto-detect the QuickLook executable path, returning the full path or
+/// an empty string if not found.
+#[tauri::command]
+pub fn find_quicklook_path() -> String {
+    quicklook::detect_quicklook()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default()
+}
+
 /// Launch QuickLook to preview a file. Returns a status string so the
 /// frontend can show an appropriate message without throwing an error.
 #[tauri::command]
-pub fn quicklook_preview(path: String) -> Result<String, String> {
-    match quicklook::preview_file(&path) {
+pub fn quicklook_preview(
+    db: State<'_, Arc<Mutex<Connection>>>,
+    path: String,
+) -> Result<String, String> {
+    let configured_path = db.lock().ok().and_then(|conn| {
+        let p = db::get_setting(&conn, "quicklook_path", "");
+        if p.is_empty() { None } else { Some(p) }
+    });
+    match quicklook::preview_file(&path, configured_path) {
         Ok(()) => Ok("ok".to_string()),
         Err(quicklook::QuickLookError::NotFound) => Ok("not_found".to_string()),
         Err(quicklook::QuickLookError::PreviewError(_)) => Ok("preview_error".to_string()),
     }
+}
+
+// ---------------------------------------------------------------------------
+// Favorites commands
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+pub fn toggle_favorite(
+    db: State<'_, Arc<Mutex<Connection>>>,
+    item_id: i64,
+    file_path: Option<String>,
+) -> Result<bool, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    db::toggle_favorite(&conn, item_id, file_path.as_deref()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_favorites(db: State<'_, Arc<Mutex<Connection>>>) -> Result<Vec<FavoriteEntry>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let favs = db::get_all_favorites(&conn).map_err(|e| e.to_string())?;
+    Ok(favs
+        .into_iter()
+        .map(|(item_id, file_path)| FavoriteEntry { item_id, file_path })
+        .collect())
 }
 
 // ---------------------------------------------------------------------------

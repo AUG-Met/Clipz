@@ -16,6 +16,8 @@ export interface AppSettings {
   click_mode: number;
   autostart: boolean;
   quicklook: boolean;
+  quicklook_path: string | null;
+  auto_collapse: boolean;
 }
 
 export type ClickMode = 1 | 2 | 3 | 4;
@@ -23,3 +25,18 @@ export type ClickMode = 1 | 2 | 3 | 4;
 // 2: Single click to copy & close
 // 3: Single select, double click to copy
 // 4: Double click to copy & close
+
+export type Category =
+  | "all"
+  | "favorites"
+  | "text"
+  | "links"
+  | "documents"
+  | "media"
+  | "other";
+
+/** A favorite record: an item, or a specific file within an item. */
+export interface FavoriteEntry {
+  item_id: number;
+  file_path: string | null;
+}

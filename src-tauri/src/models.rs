@@ -24,6 +24,15 @@ pub struct Settings {
     pub click_mode: i32,
     pub autostart: bool,
     pub quicklook: bool,
+    pub quicklook_path: Option<String>,
+    pub auto_collapse: bool,
+}
+
+/// A favorite record: an item, or a specific file within an item.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FavoriteEntry {
+    pub item_id: i64,
+    pub file_path: Option<String>,
 }
 
 /// Payload sent to the frontend via the `clipboard-changed` event.

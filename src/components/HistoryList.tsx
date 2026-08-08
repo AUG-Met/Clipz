@@ -1,11 +1,17 @@
-import { useState, useRef, useEffect } from "react";
-import { HistoryItem, ClickMode } from "../types";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { HistoryItem, ClickMode, Category } from "../types";
 import { t } from "../i18n";
+import { extractLinks } from "../lib/links";
 
 interface Props {
   items: HistoryItem[];
+  itemKey?: (item: HistoryItem) => string;
   selectedId: number | null;
   clickMode: ClickMode;
+  autoCollapse: boolean;
+  category: Category;
+  isFavorite: (itemId: number) => boolean;
+  onToggleFavorite: (itemId: number, filePath?: string) => void;
   onSelect: (item: HistoryItem) => void;
   onCopy: (item: HistoryItem) => void;
   onDelete: (id: number) => void;
@@ -13,13 +19,53 @@ interface Props {
   onOpenFolder: (item: HistoryItem) => void;
 }
 
-export function HistoryList({ items, selectedId, clickMode, onSelect, onCopy, onDelete, onOpen, onOpenFolder }: Props) {
+// --- Date group helpers ---
+type DateGroup = "today" | "yesterday" | "this_week" | "this_month" | "this_year" | "earlier";
+
+function getDateGroup(createdAt: string): DateGroup {
+  const date = new Date(createdAt);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  if (date >= today) return "today";
+  if (date >= yesterday) return "yesterday";
+
+  // This week: Monday to Sunday
+  const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon…
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+  if (date >= monday) return "this_week";
+
+  // This month
+  if (date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear()) return "this_month";
+  // This year
+  if (date.getFullYear() === now.getFullYear()) return "this_year";
+  return "earlier";
+}
+
+const GROUP_ORDER: DateGroup[] = ["today", "yesterday", "this_week", "this_month", "this_year", "earlier"];
+const GROUP_LABELS: Record<DateGroup, string> = {
+  today: "group_today",
+  yesterday: "group_yesterday",
+  this_week: "group_this_week",
+  this_month: "group_this_month",
+  this_year: "group_this_year",
+  earlier: "group_earlier",
+};
+
+export function HistoryList({
+  items, itemKey, selectedId, clickMode, autoCollapse, category, isFavorite, onToggleFavorite,
+  onSelect, onCopy, onDelete, onOpen, onOpenFolder,
+}: Props) {
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
     item: HistoryItem;
   } | null>(null);
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<DateGroup>>(new Set());
   const menuRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -89,6 +135,14 @@ export function HistoryList({ items, selectedId, clickMode, onSelect, onCopy, on
     path.split("\\").pop() || path.split("/").pop() || path;
 
   const formatPreview = (item: HistoryItem): string => {
+    if (category === "links" && item.type === "text") {
+      const links = extractLinks(item.text_value ?? "");
+      if (links.length > 0) {
+        const first = links[0];
+        const extra = links.length > 1 ? ` (+${links.length - 1})` : "";
+        return "🔗 " + first + extra;
+      }
+    }
     if (item.type === "text") {
       const text = item.text_value ?? "";
       const preview = text.length > 80 ? text.slice(0, 80) + "…" : text;
@@ -115,6 +169,73 @@ export function HistoryList({ items, selectedId, clickMode, onSelect, onCopy, on
     return createdAt.length >= 16 ? createdAt.slice(0, 16) : createdAt;
   };
 
+  // Build grouped items when autoCollapse is on
+  const groupedItems = useMemo(() => {
+    if (!autoCollapse) return null;
+    const groups: Map<DateGroup, HistoryItem[]> = new Map();
+    for (const g of GROUP_ORDER) groups.set(g, []);
+    for (const item of items) {
+      const g = getDateGroup(item.created_at);
+      groups.get(g)?.push(item);
+    }
+    // Remove empty groups
+    for (const [g, list] of groups) {
+      if (list.length === 0) groups.delete(g);
+    }
+    return groups;
+  }, [items, autoCollapse]);
+
+  const toggleGroup = (g: DateGroup) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(g)) next.delete(g);
+      else next.add(g);
+      return next;
+    });
+  };
+
+  const getKey = (item: HistoryItem): string => {
+    if (itemKey) return itemKey(item);
+    return `${item.id}`;
+  };
+
+  // Render a single history item row
+  const renderItem = (item: HistoryItem) => {
+    const fav = isFavorite(item.id);
+    return (
+      <div
+        key={getKey(item)}
+        className={`history-item ${item.id === selectedId ? "selected" : ""}`}
+        onClick={() => handleClick(item)}
+        onDoubleClick={() => handleDoubleClick(item)}
+        onContextMenu={(e) => handleContextMenu(e, item)}
+      >
+        <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          {fav && <span style={{ fontSize: 11, color: "var(--accent)" }}>★</span>}
+          <span style={{ flex: 1 }}>{formatPreview(item)}</span>
+        </span>
+        <div className="time">{formatTime(item.created_at)}</div>
+      </div>
+    );
+  };
+
+  // Render a group header + items
+  const renderGroup = (g: DateGroup, groupItems: HistoryItem[]) => {
+    const collapsed = collapsedGroups.has(g);
+    return (
+      <div key={g}>
+        <div className="history-group-header" onClick={() => toggleGroup(g)}>
+          <span className="history-group-arrow">{collapsed ? "▶" : "▼"}</span>
+          <span className="history-group-label">{t(GROUP_LABELS[g])}</span>
+          <span className="history-group-count">{groupItems.length}</span>
+        </div>
+        {!collapsed && groupItems.map(renderItem)}
+      </div>
+    );
+  };
+
+  const itemFav = contextMenu ? isFavorite(contextMenu.item.id) : false;
+
   return (
     <div className="history-list" ref={listRef}>
       {items.length === 0 ? (
@@ -128,19 +249,14 @@ export function HistoryList({ items, selectedId, clickMode, onSelect, onCopy, on
         >
           {t("no_records")}
         </div>
+      ) : autoCollapse && groupedItems ? (
+        GROUP_ORDER.map((g) => {
+          const gi = groupedItems.get(g);
+          if (!gi) return null;
+          return renderGroup(g, gi);
+        })
       ) : (
-        items.map((item) => (
-          <div
-            key={item.id}
-            className={`history-item ${item.id === selectedId ? "selected" : ""}`}
-            onClick={() => handleClick(item)}
-            onDoubleClick={() => handleDoubleClick(item)}
-            onContextMenu={(e) => handleContextMenu(e, item)}
-          >
-            {formatPreview(item)}
-            <div className="time">{formatTime(item.created_at)}</div>
-          </div>
-        ))
+        items.map(renderItem)
       )}
 
       {/* Context Menu */}
@@ -162,6 +278,13 @@ export function HistoryList({ items, selectedId, clickMode, onSelect, onCopy, on
               <div className="separator" />
             </>
           )}
+          <button onClick={() => {
+            onToggleFavorite(contextMenu.item.id);
+            setContextMenu(null);
+          }}>
+            {itemFav ? "★" : "☆"} {itemFav ? t("context_unfavorite") : t("context_favorite")}
+          </button>
+          <div className="separator" />
           <button onClick={() => { onDelete(contextMenu.item.id); setContextMenu(null); }}>
             🗑 {t("context_delete")}
           </button>

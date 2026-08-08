@@ -9,7 +9,7 @@ pub enum QuickLookError {
 }
 
 /// Search for QuickLook.exe in the standard installation paths.
-fn find_quicklook() -> Option<PathBuf> {
+pub fn detect_quicklook() -> Option<PathBuf> {
     let candidates = [
         // %LOCALAPPDATA%\Programs\QuickLook\QuickLook.exe
         PathBuf::from(std::env::var_os("LOCALAPPDATA")?).join("Programs").join("QuickLook").join("QuickLook.exe"),
@@ -27,10 +27,22 @@ fn find_quicklook() -> Option<PathBuf> {
     None
 }
 
+/// Resolve the QuickLook executable: prefer the user-configured path, then
+/// fall back to auto-detection in the standard install locations.
+fn find_quicklook(configured: Option<String>) -> Option<PathBuf> {
+    if let Some(p) = configured {
+        let pb = PathBuf::from(p);
+        if pb.is_file() {
+            return Some(pb);
+        }
+    }
+    detect_quicklook()
+}
+
 /// Launch QuickLook.exe to preview the given file path.
 /// Returns `Ok(())` on success, or an appropriate `QuickLookError`.
-pub fn preview_file(path: &str) -> Result<(), QuickLookError> {
-    let ql_path = find_quicklook().ok_or(QuickLookError::NotFound)?;
+pub fn preview_file(path: &str, configured_path: Option<String>) -> Result<(), QuickLookError> {
+    let ql_path = find_quicklook(configured_path).ok_or(QuickLookError::NotFound)?;
 
     let mut cmd = Command::new(ql_path);
     cmd.arg(path);

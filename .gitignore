@@ -29,3 +29,5 @@ src-tauri/target/
 
 # npm
 npm-debug.log*
+# Local dev config
+.claude/

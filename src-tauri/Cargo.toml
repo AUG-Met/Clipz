@@ -1,6 +1,6 @@
 [package]
 name = "clipz"
-version = "1.0.1"
+version = "1.1.0"
 description = "A lightweight clipboard manager with history, global hotkey and system tray"
 authors = ["AUG-Met"]
 edition = "2021"
@@ -29,6 +29,7 @@ md-5 = "0.10"
 arboard = "3"
 rdev = "0.5"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+tauri-plugin-dialog = "2.7.2"
 
 [target.'cfg(windows)'.dependencies]
 clipboard-win = "5"
@@ -41,7 +42,6 @@ windows-sys = { version = "0.59", features = [
 ] }
 
 [profile.release]
-codegen-units = 1
-lto = true
+# 发布正式版前可恢复 lto=true 和 codegen-units=1 以获得更优体积
 strip = "symbols"
 panic = "abort"
