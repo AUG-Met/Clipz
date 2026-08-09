@@ -37,6 +37,8 @@ function App() {
     quicklook: false,
     quicklook_path: null,
     auto_collapse: true,
+    auto_paste: false,
+    auto_paste_close: false,
   });
   const [clickMode, setClickMode] = useState<ClickMode>(1);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -244,6 +246,7 @@ function App() {
   };
 
   const copyItem = useCallback(async (item: HistoryItem) => {
+    let copied = false;
     try {
       if (item.type === "text") {
         // Copy the edited text if the user modified it in the preview.
@@ -251,6 +254,7 @@ function App() {
         // Use the backend command so the clipboard monitor suppresses this
         // change and does not create a duplicate history entry.
         await invoke("copy_text", { text });
+        copied = true;
       } else if (item.type === "file" || item.type === "files") {
         let paths = parsePaths(item.text_value);
         // In a named category, only copy the files that match that category
@@ -263,11 +267,13 @@ function App() {
         }
         if (paths.length > 0) {
           await invoke("copy_files", { paths });
+          copied = true;
         } else {
           return;
         }
       } else if (item.type === "image" && item.image_path) {
         await invoke("copy_image", { path: item.image_path });
+        copied = true;
       } else {
         // Unsupported type — nothing to copy.
         return;
@@ -275,8 +281,23 @@ function App() {
       showToast(t("copied"));
     } catch (e) {
       console.error("copy failed", e);
+      return; // Don't paste or close if the copy failed.
     }
-    if (clickMode === 2 || clickMode === 4) {
+    if (settings.auto_paste && copied) {
+      // Auto-paste: pass the text so the backend re-sets it right before
+      // pasting (avoids pasting a previously-clicked item due to timing).
+      const pasteText = item.type === "text"
+        ? (editedTextRef.current ?? item.text_value ?? "")
+        : null;
+      try {
+        await invoke("paste_to_previous_window", {
+          closeAfterPaste: settings.auto_paste_close,
+          text: pasteText,
+        });
+      } catch (e) {
+        console.error("paste failed", e);
+      }
+    } else if (clickMode === 2 || clickMode === 4) {
       // Copy & close
       try {
         await invoke("hide_window");
@@ -284,7 +305,7 @@ function App() {
         console.error("hide failed", e);
       }
     }
-  }, [clickMode, showToast, category]);
+  }, [clickMode, showToast, category, settings.auto_paste, settings.auto_paste_close]);
 
   // Copy a single file from a multi-file item as a NEW history entry.
   const copySingleFile = useCallback(async (filePath: string) => {

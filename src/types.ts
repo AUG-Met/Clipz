@@ -18,6 +18,8 @@ export interface AppSettings {
   quicklook: boolean;
   quicklook_path: string | null;
   auto_collapse: boolean;
+  auto_paste: boolean;
+  auto_paste_close: boolean;
 }
 
 export type ClickMode = 1 | 2 | 3 | 4;

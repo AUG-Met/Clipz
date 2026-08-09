@@ -191,6 +191,37 @@ export function SettingsPanel({ settings: initial, onSave, onBack }: Props) {
                 </select>
               </div>
             </div>
+
+            <div className="settings-card">
+              <div className="settings-row">
+                <h3>{t("settings_auto_paste")}</h3>
+                <label className="toggle">
+                  <input
+                    type="checkbox"
+                    checked={settings.auto_paste}
+                    onChange={(e) => update({ auto_paste: e.target.checked })}
+                  />
+                  <span className="slider" />
+                </label>
+              </div>
+              <div className="desc">{t("settings_auto_paste_desc")}</div>
+              {settings.auto_paste && (
+                <div className="settings-row" style={{ marginTop: 12 }}>
+                  <h3>{t("settings_auto_paste_close")}</h3>
+                  <label className="toggle">
+                    <input
+                      type="checkbox"
+                      checked={settings.auto_paste_close}
+                      onChange={(e) => update({ auto_paste_close: e.target.checked })}
+                    />
+                    <span className="slider" />
+                  </label>
+                </div>
+              )}
+              {settings.auto_paste && (
+                <div className="desc">{t("settings_auto_paste_close_desc")}</div>
+              )}
+            </div>
           </>
         )}
 

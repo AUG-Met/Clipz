@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use md5::{Digest, Md5};
 use rusqlite::Connection;
-use tauri::{AppHandle, State, Window};
+use tauri::{AppHandle, Manager, State, Window};
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
@@ -99,6 +99,8 @@ pub fn get_settings(
             if p.is_empty() { None } else { Some(p) }
         },
         auto_collapse: db::get_setting(&conn, "auto_collapse", "true") == "true",
+        auto_paste: db::get_setting(&conn, "auto_paste", "false") == "true",
+        auto_paste_close: db::get_setting(&conn, "auto_paste_close", "false") == "true",
     })
 }
 
@@ -128,6 +130,10 @@ pub fn save_settings(
     )
     .map_err(|e| e.to_string())?;
     db::set_setting(&conn, "auto_collapse", &settings.auto_collapse.to_string())
+        .map_err(|e| e.to_string())?;
+    db::set_setting(&conn, "auto_paste", &settings.auto_paste.to_string())
+        .map_err(|e| e.to_string())?;
+    db::set_setting(&conn, "auto_paste_close", &settings.auto_paste_close.to_string())
         .map_err(|e| e.to_string())?;
     drop(conn);
 
@@ -160,6 +166,57 @@ pub fn hide_window(window: Window) -> Result<(), String> {
 pub fn show_window(window: Window) -> Result<(), String> {
     window.show().map_err(|e| e.to_string())?;
     window.set_focus().map_err(|e| e.to_string())
+}
+
+/// Auto-paste flow: hide Clipz, wait for focus to return to the previous app,
+/// then send Ctrl+V to paste the just-copied item. The text to paste is passed
+/// in and re-set on the clipboard right before pasting, so the delayed Ctrl+V
+/// always pastes the item the user actually clicked (not whatever happens to
+/// be on the clipboard if they clicked another item in between).
+#[tauri::command]
+pub fn paste_to_previous_window(
+    suppressed_hash: State<'_, Arc<Mutex<Option<String>>>>,
+    app: AppHandle,
+    window: Window,
+    close_after_paste: bool,
+    text: Option<String>,
+) -> Result<(), String> {
+    let prev_hwnd = app
+        .try_state::<crate::PreviousAppWindow>()
+        .map(|s| *s.0.lock().unwrap())
+        .unwrap_or(0);
+
+    if prev_hwnd == 0 {
+        // No valid previous app window — nothing to paste into. Just copy.
+        return Ok(());
+    }
+
+    window.hide().map_err(|e| e.to_string())?;
+
+    let suppressed = suppressed_hash.inner().clone();
+
+    // Spawn a background thread: wait for focus to restore, set the clipboard
+    // to the clicked text just before pasting, then send Ctrl+V.
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(180));
+        if let Some(t) = &text {
+            let hash = format!("{:x}", Md5::digest(t.as_bytes()));
+            if let Ok(mut supp) = suppressed.lock() {
+                *supp = Some(hash);
+            }
+            if let Ok(mut cb) = arboard::Clipboard::new() {
+                let _ = cb.set_text(t);
+            }
+        }
+        #[cfg(target_os = "windows")]
+        crate::clipboard::send_paste();
+        if !close_after_paste {
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
+    });
+
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------

@@ -103,7 +103,7 @@ pub fn start_clipboard_monitor(
                         }
                         Err(e) => println!("  [monitor] db.lock error: {}", e),
                     }
-                }
+                    }
                 ClipboardContent::Image{width, height, bytes, md5} => {
                     if check_suppressed(&suppressed_hash, &md5) {
                         continue;
@@ -161,6 +161,24 @@ pub fn start_clipboard_monitor(
             }
         }
     });
+}
+
+/// Send a Ctrl+V key combination to the focused window via SendInput.
+#[cfg(target_os = "windows")]
+pub(crate) fn send_paste() {
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::*;
+
+    const VK_V: u16 = 0x56; // 'V'
+
+    let inputs = [
+        INPUT { r#type: INPUT_KEYBOARD, Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: VK_CONTROL, wScan: 0, dwFlags: 0, time: 0, dwExtraInfo: 0 } } },
+        INPUT { r#type: INPUT_KEYBOARD, Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: VK_V, wScan: 0, dwFlags: 0, time: 0, dwExtraInfo: 0 } } },
+        INPUT { r#type: INPUT_KEYBOARD, Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: VK_V, wScan: 0, dwFlags: KEYEVENTF_KEYUP, time: 0, dwExtraInfo: 0 } } },
+        INPUT { r#type: INPUT_KEYBOARD, Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: VK_CONTROL, wScan: 0, dwFlags: KEYEVENTF_KEYUP, time: 0, dwExtraInfo: 0 } } },
+    ];
+    unsafe {
+        SendInput(4, inputs.as_ptr(), std::mem::size_of::<INPUT>() as i32);
+    }
 }
 
 /// Check the system clipboard and return what changed (if anything).

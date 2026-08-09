@@ -22,6 +22,12 @@ pub struct ThemeSetting(pub Arc<Mutex<String>>);
 /// the new one.
 pub struct CurrentShortcut(pub Arc<Mutex<String>>);
 
+/// Managed state: the HWND of the app window that was in the foreground when
+/// Clipz was shown (0 if none, e.g. opened from the desktop or when the
+/// foreground window is the desktop shell). The auto-paste flow uses this to
+/// decide whether there is a valid paste target (non-zero = paste & close).
+pub struct PreviousAppWindow(pub Arc<Mutex<isize>>);
+
 #[cfg(target_os = "windows")]
 #[link(name = "uxtheme")]
 extern "system" {
@@ -180,6 +186,7 @@ pub fn run() {
             commands::save_settings,
             commands::hide_window,
             commands::show_window,
+            commands::paste_to_previous_window,
             commands::copy_text,
             commands::copy_files,
             commands::copy_file_as_new,
@@ -266,6 +273,7 @@ fn register_hotkey(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     })?;
 
     app.manage(CurrentShortcut(Arc::new(Mutex::new(shortcut_str))));
+            app.manage(PreviousAppWindow(Arc::new(Mutex::new(0))));
 
     Ok(())
 }
@@ -292,13 +300,67 @@ pub fn build_shortcut_str(modifier: &str, key: &str) -> String {
 // ---------------------------------------------------------------------------
 
 /// Show the window if hidden, hide it if visible.
+///
+/// When showing, we capture the current foreground window (the app the user
+/// was in) so the auto-paste flow can paste directly into the right window.
+/// The Clipz window is shown always-on-top and then focus is handed back to
+/// the original app, so it floats over the user's work without stealing input.
 fn toggle_main_window(handle: &AppHandle) {
     if let Some(window) = handle.get_webview_window("main") {
-        if window.is_visible().unwrap_or(false) {
-            let _ = window.hide();
-        } else {
+        let minimized = window.is_minimized().unwrap_or(false);
+        let visible = window.is_visible().unwrap_or(false);
+
+        // Minimized → restore directly from the taskbar (no tray hop).
+        if minimized {
             let _ = window.show();
+            let _ = window.unminimize();
+            let _ = window.set_always_on_top(true);
             let _ = window.set_focus();
+            return;
+        }
+        // Visible but not minimized → hide to tray
+        if visible {
+            let _ = window.set_always_on_top(false);
+            let _ = window.hide();
+            return;
+        }
+        // Hidden → show, capture previous window, float on top
+        let prev = {
+            #[cfg(target_os = "windows")]
+            {
+                use windows_sys::Win32::UI::WindowsAndMessaging::{
+                    GetForegroundWindow, GetShellWindow,
+                };
+                let fg = unsafe { GetForegroundWindow() };
+                let shell = unsafe { GetShellWindow() };
+                // Only treat it as a valid paste target if the foreground
+                // window is a real application window, not the desktop.
+                if fg != std::ptr::null_mut() && fg != shell { fg as isize } else { 0 }
+            }
+            #[cfg(not(target_os = "windows"))]
+            0
+        };
+        if let Some(state) = handle.try_state::<PreviousAppWindow>() {
+            *state.0.lock().unwrap() = prev;
+        }
+
+        let _ = window.show();
+        let _ = window.set_always_on_top(true);
+        // Hand focus back to the app the user was in, so Clipz floats on
+        // top without grabbing keyboard focus. Spawn a short-lived thread
+        // so the calling thread is no longer the "foreground thread" when
+        // SetForegroundWindow runs, which bypasses the Windows foreground
+        // lock.
+        #[cfg(target_os = "windows")]
+        if prev != 0 {
+            let prev_raw = prev; // isize is Send
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_millis(50));
+                unsafe {
+                    use windows_sys::Win32::UI::WindowsAndMessaging::SetForegroundWindow;
+                    SetForegroundWindow(prev_raw as *mut core::ffi::c_void);
+                }
+            });
         }
     }
 }

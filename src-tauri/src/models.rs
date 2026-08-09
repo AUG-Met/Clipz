@@ -26,6 +26,8 @@ pub struct Settings {
     pub quicklook: bool,
     pub quicklook_path: Option<String>,
     pub auto_collapse: bool,
+    pub auto_paste: bool,
+    pub auto_paste_close: bool,
 }
 
 /// A favorite record: an item, or a specific file within an item.
