@@ -1,6 +1,6 @@
 [package]
 name = "clipz"
-version = "1.1.0"
+version = "1.1.1"
 description = "A lightweight clipboard manager with history, global hotkey and system tray"
 authors = ["AUG-Met"]
 edition = "2021"
@@ -10,7 +10,7 @@ rust-version = "1.77.2"
 
 [lib]
 name = "clipz_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+crate-type = ["rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -42,6 +42,7 @@ windows-sys = { version = "0.59", features = [
 ] }
 
 [profile.release]
-# 发布正式版前可恢复 lto=true 和 codegen-units=1 以获得更优体积
+lto = true
+codegen-units = 1
 strip = "symbols"
 panic = "abort"

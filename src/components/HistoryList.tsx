@@ -140,7 +140,10 @@ export function HistoryList({
       if (links.length > 0) {
         const first = links[0];
         const extra = links.length > 1 ? ` (+${links.length - 1})` : "";
-        return "🔗 " + first + extra;
+        // Strip the protocol for a more compact list row.
+        const shown = first.replace(/^https?:\/\//, "");
+        // Truncate long URLs so a single row doesn't dominate the list.
+        return "🔗 " + (shown.length > 40 ? shown.slice(0, 40) + "…" : shown) + extra;
       }
     }
     if (item.type === "text") {

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { HistoryItem, Category } from "../types";
 import { t } from "../i18n";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { open as openExternal } from "@tauri-apps/plugin-shell";
 import { extractLinks } from "../lib/links";
 
 interface Props {
@@ -170,8 +171,14 @@ export function PreviewPanel({ item, category, quicklookEnabled, onHoverFile, on
         <div className="preview-content">
           <div className="preview-link-list">
             {links.map((link, i) => (
-              <div key={i} className="preview-link-item">
-                🔗 <span style={{ userSelect: "text", wordBreak: "break-all" }}>{link}</span>
+              <div
+                key={i}
+                className="preview-link-item"
+                onClick={(e) => { e.stopPropagation(); openExternal(link.startsWith("http") ? link : "https://" + link); }}
+                title={link}
+              >
+                <span className="preview-link-icon">🔗</span>
+                <span className="preview-link-text" style={{ wordBreak: "break-all" }}>{link}</span>
               </div>
             ))}
           </div>

@@ -76,7 +76,7 @@ const en: Record<string, string> = {
   ql_not_found: "QuickLook not found. Please install QuickLook first.",
   ql_preview_error: "QuickLook preview failed",
   about_title: "About Clipz",
-  about_version: "Version: v1.1.0",
+  about_version: "Version: v1.1.1",
   about_desc: "Windows Clipboard History Manager\nSupports text, files, and images history\nGlobal hotkey for quick access",
   about_author: "Author: AUG-Met",
   about_repo: "GitHub Repository",

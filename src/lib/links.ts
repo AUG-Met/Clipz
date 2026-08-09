@@ -16,7 +16,7 @@ const TLDS = [
   "city", "center", "care", "services", "solutions", "technology",
   "management", "systems", "productions", "photography", "gallery", "pictures",
   "fan", "watch", "toys", "dog", "cat", "pet", "plus", "family", "fun",
-  "properties", "directory", "exchange", "market", "media", "email", "news",
+  "properties", "directory", "exchange", "market",
   // Major ccTLDs
   "cn", "co", "us", "uk", "de", "fr", "jp", "ru", "au", "ca", "in", "br",
   "it", "es", "mx", "nl", "se", "no", "fi", "dk", "at", "ch", "be", "pl",
@@ -33,8 +33,12 @@ const TLD_SET = new Set(TLDS);
 // chains (`System.IO.IOException`) and file paths (`file.dll`, `Pack.co…`)
 // are rejected. TLDs are matched case-sensitively because real domains use
 // lowercase TLDs while code identifiers use PascalCase.
+//
+// Structure: (protocol)?(www.)?  (label.)+  TLD  path?
+// The final dot-segment is matched against the TLD whitelist so the preceding
+// `(?:[a-zA-Z0-9-]+\.)+` never consumes the TLD.
 const URL_REGEX = new RegExp(
-  `(?:https?://)?(?:www\\.)?[a-zA-Z0-9-]+(?:\\.[a-zA-Z0-9-]+)*\\.(${TLDS.join(
+  `(?:https?://)?(?:[a-zA-Z0-9-]+\\.)+(${TLDS.join(
     "|"
   )})\\b(?:[/?#][^\\s]*)?`,
   "g"
@@ -42,18 +46,19 @@ const URL_REGEX = new RegExp(
 
 /** Extract deduplicated links from text, stripping trailing punctuation. */
 export function extractLinks(text: string): string[] {
-  const matches = text.match(URL_REGEX) || [];
+  const matches = text.matchAll(URL_REGEX);
   const seen = new Set<string>();
   const out: string[] = [];
   for (const m of matches) {
-    // Reject if the matched TLD isn't in the whitelist (Regex already enforces
-    // this, but stay defensive).
-    const clean = m.replace(/[.,;:!?)]+$/g, "");
-    if (TLD_SET.has(clean.toLowerCase().split(".").pop() ?? "")) {
-      if (!seen.has(clean)) {
-        seen.add(clean);
-        out.push(clean);
-      }
+    // Use the regex capture group (m[1]) as the TLD, NOT the last dot-segment
+    // of the full URL — for "https://github.com/login/device" the last dot
+    // segment is "device", not the TLD "com".
+    const tld = m[1];
+    if (!tld || !TLD_SET.has(tld)) continue;
+    const clean = m[0].replace(/[.,;:!?)]+$/g, "");
+    if (!seen.has(clean)) {
+      seen.add(clean);
+      out.push(clean);
     }
   }
   return out;

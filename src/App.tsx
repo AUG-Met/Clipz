@@ -491,7 +491,7 @@ function App() {
             <button
               key={cat}
               className={`category-tab ${category === cat ? "active" : ""}`}
-              onClick={() => setCategory(cat)}
+              onClick={() => { setCategory(cat); setSelectedItem(null); }}
             >
               {t(`category_${cat}`)}
             </button>

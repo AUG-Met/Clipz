@@ -277,13 +277,32 @@ html, body, #root {
 }
 
 .preview-link-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 14px;
   font-weight: bold;
   padding: 8px 10px;
   background: var(--card-hover);
   border-radius: 6px;
   border-left: 3px solid var(--accent);
-  word-break: break-all;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.preview-link-item:hover {
+  background: var(--card-selected);
+}
+
+.preview-link-icon {
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.preview-link-text {
+  user-select: text;
+  color: var(--accent);
+  text-decoration: underline;
 }
 
 .preview-link-source {
