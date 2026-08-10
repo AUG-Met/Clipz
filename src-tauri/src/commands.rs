@@ -12,6 +12,15 @@ use crate::quicklook;
 use crate::ThemeSetting;
 use crate::CurrentShortcut;
 
+/// Format the current time as a simple ISO timestamp for the backup metadata.
+fn export_timestamp() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let d = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default();
+    format!("{:?}", d.as_secs())
+}
+
 /// Append a line to a debug log file under the temp dir, so `open_folder`
 /// diagnostics are visible even though a release build has no console.
 fn debug_log(line: &str) {
@@ -217,6 +226,132 @@ pub fn paste_to_previous_window(
     });
 
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Backup / Export-Import commands
+// ---------------------------------------------------------------------------
+
+/// Read a backup JSON file and return which sections are present, so the
+/// frontend can show checkboxes for only the available data.
+#[tauri::command]
+pub fn inspect_backup(path: String) -> Result<crate::models::BackupSectionInfo, String> {
+    let raw = std::fs::read_to_string(&path).map_err(|e| format!("读取失败: {}", e))?;
+    let backup: crate::models::BackupFile =
+        serde_json::from_str(&raw).map_err(|e| format!("备份文件格式无效: {}", e))?;
+    Ok(crate::models::BackupSectionInfo {
+        history: !backup.data.history.is_empty(),
+        favorites: !backup.data.favorites.is_empty(),
+        settings: !backup.data.settings.is_empty(),
+    })
+}
+
+/// Export the selected data sections (history / favorites / settings) to a
+/// JSON file at `path`. Only the sections the user selected are written.
+#[tauri::command]
+pub fn export_backup(
+    db: State<'_, Arc<Mutex<Connection>>>,
+    path: String,
+    include_history: bool,
+    include_favorites: bool,
+    include_settings: bool,
+) -> Result<i64, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+
+    let mut data = crate::models::BackupData::default();
+    let mut count = 0i64;
+
+    if include_history {
+        data.history = db::get_all_history(&conn).map_err(|e| e.to_string())?;
+        count += data.history.len() as i64;
+    }
+
+    if include_favorites {
+        let favs = db::get_all_favorites(&conn).map_err(|e| e.to_string())?;
+        data.favorites = favs
+            .into_iter()
+            .map(|(item_id, file_path)| crate::models::ImportedFavoriteRow { item_id, file_path })
+            .collect();
+        count += data.favorites.len() as i64;
+    }
+
+    if include_settings {
+        let settings = db::get_all_settings(&conn).map_err(|e| e.to_string())?;
+        count += settings.len() as i64;
+        data.settings = settings.into_iter().collect();
+    }
+
+    drop(conn);
+
+    let backup = crate::models::BackupFile {
+        version: env!("CARGO_PKG_VERSION").to_string(),
+        exported_at: export_timestamp(),
+        app: "clipz".to_string(),
+        data,
+    };
+    let json = serde_json::to_string_pretty(&backup).map_err(|e| e.to_string())?;
+    std::fs::write(&path, json).map_err(|e| format!("写入失败: {}", e))?;
+    Ok(count)
+}
+
+/// Read a backup JSON file at `path` and merge the selected data sections into
+/// the database. History rows keep their original ids (INSERT OR IGNORE), so
+/// favorites referencing those ids stay linked. When favorites are imported
+/// without history, the history rows those favorites point to are pulled in
+/// automatically — otherwise the favorites would be orphaned and invisible.
+#[tauri::command]
+pub fn import_backup(
+    db: State<'_, Arc<Mutex<Connection>>>,
+    path: String,
+    include_history: bool,
+    include_favorites: bool,
+    include_settings: bool,
+) -> Result<i64, String> {
+    let raw = std::fs::read_to_string(&path).map_err(|e| format!("读取失败: {}", e))?;
+    let backup: crate::models::BackupFile =
+        serde_json::from_str(&raw).map_err(|e| format!("备份文件格式无效: {}", e))?;
+
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let mut imported = 0i64;
+
+    if include_history && !backup.data.history.is_empty() {
+        db::import_history_rows(&conn, &backup.data.history).map_err(|e| e.to_string())?;
+        imported += backup.data.history.len() as i64;
+    }
+    // Collapse duplicate content left by older buggy versions so that
+    // each (md5_hash, item_type) group has only the newest row.
+    if include_history {
+        db::dedup_history(&conn).map_err(|e| e.to_string())?;
+    }
+    if include_favorites && !backup.data.favorites.is_empty() {
+        // If the user imported favorites without history, auto-import the
+        // history rows those favorites reference so they are not orphaned.
+        if !include_history {
+            let fav_ids: std::collections::HashSet<i64> =
+                backup.data.favorites.iter().map(|f| f.item_id).collect();
+            let needed: Vec<crate::models::ImportedHistoryRow> = backup
+                .data
+                .history
+                .iter()
+                .filter(|h| fav_ids.contains(&h.id))
+                .cloned()
+                .collect();
+            if !needed.is_empty() {
+                db::import_history_rows(&conn, &needed).map_err(|e| e.to_string())?;
+                db::dedup_history(&conn).map_err(|e| e.to_string())?;
+            }
+        }
+        db::import_favorite_rows(&conn, &backup.data.favorites).map_err(|e| e.to_string())?;
+        imported += backup.data.favorites.len() as i64;
+    }
+    if include_settings {
+        for (k, v) in &backup.data.settings {
+            db::set_setting(&conn, k, v).map_err(|e| e.to_string())?;
+            imported += 1;
+        }
+    }
+
+    Ok(imported)
 }
 
 // ---------------------------------------------------------------------------
@@ -527,5 +662,41 @@ pub fn open_folder(path: String) -> Result<(), String> {
     {
         let _ = path;
     }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// App restart command
+// ---------------------------------------------------------------------------
+
+/// Restart the app by spawning a new process with a short delay, then exiting
+/// the current one. Uses a cmd wrapper so the new process starts after the
+/// current process has fully exited, avoiding the single-instance plugin
+/// detecting the old instance. The cmd window is hidden via CREATE_NO_WINDOW.
+#[tauri::command]
+pub fn restart_app(app: AppHandle) -> Result<(), String> {
+    let exe = std::env::current_exe().map_err(|e| format!("获取程序路径失败: {}", e))?;
+    let exe_str = exe.to_string_lossy().to_string();
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        let mut cmd = std::process::Command::new("cmd");
+        cmd.args(["/C", "timeout", "/T", "1", "/NOBREAK", ">nul", "&&", "start", ""]);
+        cmd.arg(&exe_str);
+        cmd.creation_flags(CREATE_NO_WINDOW);
+        cmd.spawn().map_err(|e| format!("启动失败: {}", e))?;
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let mut cmd = std::process::Command::new("cmd");
+        cmd.args(["/C", "timeout", "/T", "1", "/NOBREAK", ">nul", "&&", "start", ""]);
+        cmd.arg(&exe_str);
+        cmd.spawn().map_err(|e| format!("启动失败: {}", e))?;
+    }
+
+    app.exit(0);
     Ok(())
 }

@@ -187,6 +187,9 @@ pub fn run() {
             commands::hide_window,
             commands::show_window,
             commands::paste_to_previous_window,
+            commands::export_backup,
+            commands::import_backup,
+            commands::inspect_backup,
             commands::copy_text,
             commands::copy_files,
             commands::copy_file_as_new,
@@ -198,6 +201,7 @@ pub fn run() {
             commands::open_paths,
             commands::open_folder,
             commands::find_quicklook_path,
+            commands::restart_app,
             commands::toggle_favorite,
             commands::get_favorites,
         ])

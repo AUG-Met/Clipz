@@ -63,3 +63,55 @@ impl From<HistoryItem> for ClipboardData {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// Backup / Import models
+// ---------------------------------------------------------------------------
+
+/// A history row as stored in the DB (file_paths column included), used when
+/// importing a backup so the raw row can be re-inserted verbatim.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportedHistoryRow {
+    pub id: i64,
+    pub item_type: String,
+    pub text_value: Option<String>,
+    pub image_path: Option<String>,
+    pub thumbnail_path: Option<String>,
+    pub file_paths: Option<String>,
+    pub md5_hash: Option<String>,
+    pub created_at: String,
+}
+
+/// A favorite row for import.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportedFavoriteRow {
+    pub item_id: i64,
+    pub file_path: Option<String>,
+}
+
+/// The JSON file written by export and read by import.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BackupFile {
+    pub version: String,
+    pub exported_at: String,
+    pub app: String,
+    pub data: BackupData,
+}
+
+/// Information about which sections exist in a backup file.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BackupSectionInfo {
+    pub history: bool,
+    pub favorites: bool,
+    pub settings: bool,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct BackupData {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub history: Vec<ImportedHistoryRow>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub favorites: Vec<ImportedFavoriteRow>,
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub settings: std::collections::BTreeMap<String, String>,
+}

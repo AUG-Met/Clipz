@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open as openExternal } from "@tauri-apps/plugin-shell";
-import { open as openFile } from "@tauri-apps/plugin-dialog";
+import { open as openFile, save as saveFile } from "@tauri-apps/plugin-dialog";
 import { AppSettings } from "../types";
 import { t } from "../i18n";
 
@@ -9,9 +9,12 @@ interface Props {
   settings: AppSettings;
   onSave: (settings: AppSettings) => void;
   onBack: () => void;
+  onToast?: (msg: string) => void;
 }
 
-type Tab = "appearance" | "actions" | "other" | "about";
+type Tab = "appearance" | "actions" | "other" | "backup" | "about";
+
+const JSON_FILTERS = [{ name: "JSON", extensions: ["json"] }];
 
 const MODIFIERS: Record<string, string> = {
   ctrl: "Ctrl",
@@ -26,12 +29,14 @@ const MODIFIERS: Record<string, string> = {
 
 const KEYS = ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12"];
 
-export function SettingsPanel({ settings: initial, onSave, onBack }: Props) {
+export function SettingsPanel({ settings: initial, onSave, onBack, onToast }: Props) {
   const [tab, setTab] = useState<Tab>("appearance");
   const [settings, setSettings] = useState<AppSettings>(initial);
   const [capturingKey, setCapturingKey] = useState(false);
   const [detecting, setDetecting] = useState(false);
   const [qlNotFound, setQlNotFound] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   // Auto-detect QuickLook path when the toggle is turned on and no path is set.
   useEffect(() => {
@@ -90,6 +95,84 @@ export function SettingsPanel({ settings: initial, onSave, onBack }: Props) {
     onSave(settings);
   };
 
+  // Backup modal state
+  type BackupModal = { mode: "export" } | { mode: "import"; path: string; available: { history: boolean; favorites: boolean; settings: boolean } };
+  const [backupModal, setBackupModal] = useState<BackupModal | null>(null);
+  const [backupSel, setBackupSel] = useState({ history: true, favorites: true, settings: true });
+
+  const openExportModal = () => {
+    setBackupSel({ history: true, favorites: true, settings: true });
+    setBackupModal({ mode: "export" });
+  };
+
+  const notify = (msg: string) => { onToast?.(msg); };
+
+  const doExport = async () => {
+    if (backupModal?.mode !== "export") return;
+    setBackupModal(null);
+    const path = await saveFile({
+      title: t("backup_export"),
+      defaultPath: "clipz-backup.json",
+      filters: JSON_FILTERS,
+    });
+    if (!path) return;
+    setExporting(true);
+    try {
+      await invoke<number>("export_backup", {
+        path,
+        includeHistory: backupSel.history,
+        includeFavorites: backupSel.favorites,
+        includeSettings: backupSel.settings,
+      });
+      notify(t("backup_exported"));
+    } catch (e) {
+      console.error("export backup failed", e);
+      notify(t("backup_error"));
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const openImportModal = async () => {
+    const selected = await openFile({
+      title: t("backup_import"),
+      filters: JSON_FILTERS,
+      multiple: false,
+    });
+    if (!selected || typeof selected !== "string") return;
+    try {
+      const available = await invoke<{ history: boolean; favorites: boolean; settings: boolean }>("inspect_backup", { path: selected });
+      setBackupSel({ history: available.history, favorites: available.favorites, settings: available.settings });
+      setBackupModal({ mode: "import", path: selected, available });
+    } catch (e) {
+      console.error("inspect backup failed", e);
+      notify(t("backup_error"));
+    }
+  };
+
+  const doImport = async () => {
+    if (backupModal?.mode !== "import") return;
+    const { path } = backupModal;
+    setBackupModal(null);
+    setImporting(true);
+    try {
+      await invoke<number>("import_backup", {
+        path,
+        includeHistory: backupSel.history,
+        includeFavorites: backupSel.favorites,
+        includeSettings: backupSel.settings,
+      });
+      notify(t("backup_imported"));
+      // Force restart the app so the imported data is visible immediately.
+      setTimeout(() => invoke("restart_app"), 800);
+    } catch (e) {
+      console.error("import backup failed", e);
+      notify(t("backup_error"));
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <div className="settings-overlay">
       <div className="settings-header">
@@ -97,7 +180,7 @@ export function SettingsPanel({ settings: initial, onSave, onBack }: Props) {
       </div>
 
       <div className="settings-tabs">
-        {(["appearance", "actions", "other", "about"] as Tab[]).map((tKey) => (
+        {(["appearance", "actions", "other", "backup", "about"] as Tab[]).map((tKey) => (
           <button
             key={tKey}
             className={`settings-tab ${tab === tKey ? "active" : ""}`}
@@ -288,6 +371,34 @@ export function SettingsPanel({ settings: initial, onSave, onBack }: Props) {
           </>
         )}
 
+        {tab === "backup" && (
+          <>
+            <div className="settings-card">
+              <div className="settings-row backup-row">
+                <div className="backup-info">
+                  <h3>{t("backup_export")}</h3>
+                  <div className="desc">{t("backup_export_desc")}</div>
+                </div>
+                <button className="backup-btn" onClick={openExportModal} disabled={exporting}>
+                  {exporting ? "..." : t("backup_export_btn")}
+                </button>
+              </div>
+            </div>
+
+            <div className="settings-card">
+              <div className="settings-row backup-row">
+                <div className="backup-info">
+                  <h3>{t("backup_import")}</h3>
+                  <div className="desc">{t("backup_import_merge")}</div>
+                </div>
+                <button className="backup-btn" onClick={openImportModal} disabled={importing}>
+                  {importing ? "..." : t("backup_import_btn")}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
         {tab === "about" && (
           <div className="about-card">
             <h2>📋 {t("about_title")}</h2>
@@ -305,6 +416,48 @@ export function SettingsPanel({ settings: initial, onSave, onBack }: Props) {
             </div>
           </div>
         )}
+
+          {backupModal && (
+            <div className="confirm-overlay" onClick={() => setBackupModal(null)}>
+              <div className="confirm-dialog backup-dialog" onClick={(e) => e.stopPropagation()}>
+                <div className="confirm-message" style={{ fontWeight: 600 }}>
+                  {backupModal.mode === "export" ? t("backup_export") : t("backup_import")}
+                </div>
+                <div className="backup-modal-checkboxes">
+                  {(backupModal.mode === "export" || backupModal.available.history) && (
+                    <label className="toggle-label">
+                      <input type="checkbox" checked={backupSel.history} onChange={(e) => setBackupSel(p => ({ ...p, history: e.target.checked }))} />
+                      {t("backup_history")}
+                    </label>
+                  )}
+                  {(backupModal.mode === "export" || backupModal.available.favorites) && (
+                    <label className="toggle-label">
+                      <input type="checkbox" checked={backupSel.favorites} onChange={(e) => setBackupSel(p => ({ ...p, favorites: e.target.checked }))} />
+                      {t("backup_favorites")}
+                    </label>
+                  )}
+                  {(backupModal.mode === "export" || backupModal.available.settings) && (
+                    <label className="toggle-label">
+                      <input type="checkbox" checked={backupSel.settings} onChange={(e) => setBackupSel(p => ({ ...p, settings: e.target.checked }))} />
+                      {t("backup_settings")}
+                    </label>
+                  )}
+                </div>
+                <div className="confirm-actions">
+                  <button className="btn btn-cancel" onClick={() => setBackupModal(null)}>
+                    {t("confirm_cancel")}
+                  </button>
+                  <button
+                    className="btn"
+                    onClick={backupModal.mode === "export" ? doExport : doImport}
+                    disabled={!backupSel.history && !backupSel.favorites && !backupSel.settings}
+                  >
+                    {t("confirm_ok")}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
       </div>
     </div>
   );

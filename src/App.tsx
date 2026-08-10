@@ -99,11 +99,6 @@ function App() {
       unlistenFn = fn;
     });
 
-    // Fallback: refresh every 1 second in case the event is missed
-    const interval = setInterval(() => {
-      loadHistory();
-    }, 1000);
-
     // Listen for OS theme changes so "system" theme stays in sync.
     const media = window.matchMedia("(prefers-color-scheme: dark)");
     systemDarkRef.current = media;
@@ -120,7 +115,6 @@ function App() {
 
     return () => {
       if (unlistenFn) unlistenFn();
-      clearInterval(interval);
       media.removeEventListener("change", onSystemThemeChange);
     };
   }, []);
@@ -526,6 +520,7 @@ function App() {
           settings={settings}
           onSave={handleSettingsSave}
           onBack={() => setShowSettings(false)}
+          onToast={showToast}
         />
       ) : (
         <div className="content">

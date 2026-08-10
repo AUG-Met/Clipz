@@ -1,7 +1,7 @@
 use rusqlite::{Connection, Result, params};
 use std::path::Path;
 
-use crate::models::HistoryItem;
+use crate::models::{HistoryItem, ImportedHistoryRow, ImportedFavoriteRow};
 
 /// Initialise the SQLite database, creating tables if they do not exist.
 pub fn init_db(db_path: &Path) -> Result<Connection> {
@@ -55,18 +55,30 @@ pub fn add_text(conn: &Connection, text: &str, md5_hash: &str) -> Result<i64> {
     Ok(conn.last_insert_rowid())
 }
 
-/// Insert a text item, deduping by md5_hash: deletes any existing entry with
-/// the same hash first, so the item moves to the top with a fresh timestamp.
+/// Insert a text item, deduping by md5_hash: if an entry with the same hash
+/// already exists, bump its timestamp (moving it to the top) and keep the SAME
+/// id, so the frontend can dedup by id and favorites stay valid.
 pub fn upsert_text(conn: &Connection, text: &str, md5_hash: &str) -> Result<i64> {
-    conn.execute(
-        "DELETE FROM history WHERE md5_hash = ?1 AND item_type = 'text'",
-        params![md5_hash],
-    )?;
-    conn.execute(
-        "INSERT INTO history (item_type, text_value, md5_hash) VALUES (?1, ?2, ?3)",
-        params!["text", text, md5_hash],
-    )?;
-    Ok(conn.last_insert_rowid())
+    let existing: Option<i64> = conn
+        .query_row(
+            "SELECT id FROM history WHERE md5_hash = ?1 AND item_type = 'text'",
+            params![md5_hash],
+            |row| row.get(0),
+        )
+        .ok();
+    if let Some(id) = existing {
+        conn.execute(
+            "UPDATE history SET created_at = datetime('now','localtime') WHERE id = ?1",
+            params![id],
+        )?;
+        Ok(id)
+    } else {
+        conn.execute(
+            "INSERT INTO history (item_type, text_value, md5_hash) VALUES (?1, ?2, ?3)",
+            params!["text", text, md5_hash],
+        )?;
+        Ok(conn.last_insert_rowid())
+    }
 }
 
 /// Insert an image item and return its new id.
@@ -94,13 +106,25 @@ pub fn add_file(conn: &Connection, file_paths_json: &str, md5_hash: &str) -> Res
     Ok(conn.last_insert_rowid())
 }
 
-/// Insert a file(s) item, deleting any existing entry with the same hash first (dedup + move to top).
+/// Insert a file(s) item, bumping the timestamp of an existing entry with the
+/// same hash (dedup + move to top) while keeping the same id.
 pub fn upsert_file(conn: &Connection, file_paths_json: &str, md5_hash: &str) -> Result<i64> {
-    conn.execute(
-        "DELETE FROM history WHERE md5_hash = ?1 AND (item_type = 'file' OR item_type = 'files')",
-        params![md5_hash],
-    )?;
-    add_file(conn, file_paths_json, md5_hash)
+    let existing: Option<i64> = conn
+        .query_row(
+            "SELECT id FROM history WHERE md5_hash = ?1 AND (item_type = 'file' OR item_type = 'files')",
+            params![md5_hash],
+            |row| row.get(0),
+        )
+        .ok();
+    if let Some(id) = existing {
+        conn.execute(
+            "UPDATE history SET created_at = datetime('now','localtime') WHERE id = ?1",
+            params![id],
+        )?;
+        Ok(id)
+    } else {
+        add_file(conn, file_paths_json, md5_hash)
+    }
 }
 
 /// Return the most recent history items, optionally filtered by search query.
@@ -109,12 +133,12 @@ pub fn get_history(conn: &Connection, search_query: Option<&str>) -> Result<Vec<
 
     let (sql, has_where): (String, bool) = if let Some(q) = search_query {
         if q.is_empty() {
-            (format!("SELECT id, item_type, text_value, image_path, thumbnail_path, md5_hash, created_at FROM history ORDER BY id DESC LIMIT {limit}"), false)
+            (format!("SELECT id, item_type, text_value, image_path, thumbnail_path, md5_hash, created_at FROM history ORDER BY created_at DESC, id DESC LIMIT {limit}"), false)
         } else {
-            (format!("SELECT id, item_type, text_value, image_path, thumbnail_path, md5_hash, created_at FROM history WHERE item_type = 'text' AND text_value LIKE ?1 ORDER BY id DESC LIMIT {limit}"), true)
+            (format!("SELECT id, item_type, text_value, image_path, thumbnail_path, md5_hash, created_at FROM history WHERE item_type = 'text' AND text_value LIKE ?1 ORDER BY created_at DESC, id DESC LIMIT {limit}"), true)
         }
     } else {
-        (format!("SELECT id, item_type, text_value, image_path, thumbnail_path, md5_hash, created_at FROM history ORDER BY id DESC LIMIT {limit}"), false)
+        (format!("SELECT id, item_type, text_value, image_path, thumbnail_path, md5_hash, created_at FROM history ORDER BY created_at DESC, id DESC LIMIT {limit}"), false)
     };
 
     let mut stmt = conn.prepare(&sql)?;
@@ -228,6 +252,93 @@ pub fn get_all_favorites(conn: &Connection) -> Result<Vec<(i64, Option<String>)>
         .filter_map(|r| r.ok())
         .collect();
     Ok(rows)
+}
+
+// ---------------------------------------------------------------------------
+// Backup / Export helpers
+// ---------------------------------------------------------------------------
+
+/// Return all history rows (no limit) for export, including the raw
+/// `file_paths` column so file items round-trip correctly.
+pub fn get_all_history(conn: &Connection) -> Result<Vec<ImportedHistoryRow>> {
+    let sql = "SELECT id, item_type, text_value, image_path, thumbnail_path, file_paths, md5_hash, created_at FROM history ORDER BY id DESC";
+    let mut stmt = conn.prepare(sql)?;
+    let rows = stmt.query_map([], |row| {
+        Ok(ImportedHistoryRow {
+            id: row.get(0)?,
+            item_type: row.get(1)?,
+            text_value: row.get(2)?,
+            image_path: row.get(3)?,
+            thumbnail_path: row.get(4)?,
+            file_paths: row.get(5)?,
+            md5_hash: row.get(6)?,
+            created_at: row.get(7)?,
+        })
+    })?;
+    let mut result = Vec::new();
+    for row in rows {
+        result.push(row?);
+    }
+    Ok(result)
+}
+
+/// Return all settings as key-value pairs for export.
+pub fn get_all_settings(conn: &Connection) -> Result<Vec<(String, String)>> {
+    let mut stmt = conn.prepare("SELECT key, value FROM settings")?;
+    let rows = stmt.query_map([], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+    })?;
+    let mut result = Vec::new();
+    for row in rows {
+        result.push(row?);
+    }
+    Ok(result)
+}
+
+/// Import history rows using INSERT OR IGNORE (skips rows whose id already exists).
+pub fn import_history_rows(conn: &Connection, rows: &[ImportedHistoryRow]) -> Result<()> {
+    let mut stmt = conn.prepare(
+        "INSERT OR IGNORE INTO history (id, item_type, text_value, image_path, thumbnail_path, file_paths, md5_hash, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)"
+    )?;
+    for row in rows {
+        stmt.execute(rusqlite::params![
+            row.id, row.item_type, row.text_value, row.image_path,
+            row.thumbnail_path, row.file_paths, row.md5_hash, row.created_at
+        ])?;
+    }
+    Ok(())
+}
+
+/// After an import, collapse any history rows that share the same content
+/// (md5_hash + item_type), keeping only the newest timestamp in each group.
+/// Old backups created by earlier buggy versions can contain such duplicates.
+/// Favorited rows are never deleted so favorites stay valid.
+pub fn dedup_history(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "DELETE FROM history
+         WHERE md5_hash IS NOT NULL
+           AND id NOT IN (SELECT item_id FROM favorites)
+           AND EXISTS (
+               SELECT 1 FROM history AS h2
+               WHERE h2.md5_hash = history.md5_hash
+                 AND h2.item_type = history.item_type
+                 AND (h2.created_at > history.created_at
+                      OR (h2.created_at = history.created_at AND h2.id > history.id))
+           )",
+        [],
+    )?;
+    Ok(())
+}
+
+/// Import favorite rows using INSERT OR IGNORE (skips duplicates).
+pub fn import_favorite_rows(conn: &Connection, rows: &[ImportedFavoriteRow]) -> Result<()> {
+    let mut stmt = conn.prepare(
+        "INSERT OR IGNORE INTO favorites (item_id, file_path) VALUES (?1, ?2)"
+    )?;
+    for row in rows {
+        stmt.execute(rusqlite::params![row.item_id, row.file_path])?;
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
