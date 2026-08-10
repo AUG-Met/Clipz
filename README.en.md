@@ -1,77 +1,24 @@
 # Clipz
 
-[中文版](README.md)
+A lightweight Windows clipboard history manager that lives in the system tray. Automatically records text, files, and images.
 
-**Clipz** — A lightweight Windows clipboard history manager that lives in the system tray. Automatically records text, files, and images from the clipboard. Built with Tauri + Rust + React.
+- **Ctrl+F1** to show/hide
+- Category view (All / Favorites / Text / Links / Documents / Media)
+- Search, favorites, auto-paste
+- Backup & restore data
+- Bilingual (EN/中文), theme switching
+- QuickLook file preview
 
-## Features
-
-- **Auto Recording** — Automatically tracks clipboard content (text / files / images)
-- **System Tray** — Runs in the background, **Ctrl+F1** to show/hide
-- **Multiple Click Modes** — Single click to copy, double-click to copy, auto-close after copy
-- **Search** — Quickly search through history entries
-- **Theme Switching** — Light / Dark / Follow system
-- **Bilingual** — Chinese / English UI
-- **QuickLook Preview** — Select a file and press Space to preview (requires [QuickLook](https://github.com/QL-Win/QuickLook))
-- **File Operations** — Right-click menu supports opening files and browsing containing folders
-- **Text Editing** — Edit text content directly in the preview panel (not saved to the database)
-- **Silent Autostart** — Starts with Windows and minimizes to the system tray
-
-## Usage
-
-1. Run `Clipz.exe` (from the Start menu after installation)
-2. The app automatically minimizes to the system tray
-3. Press **Ctrl+F1** to show the main window
-4. Click a history item to copy its content (text / file / image)
-5. Select a file and press **Space** to preview with QuickLook
-
-### Settings
-
-Click the **⚙ Settings** button at the bottom:
-
-| Setting | Description |
-|---------|-------------|
-| Language | 中文 / English |
-| Theme | Light / Dark / System |
-| Global Hotkey | Customize the show/hide hotkey |
-| Click Behavior | Single copy / Double copy / Copy & close |
-| Silent Autostart | Start automatically with Windows |
-| QuickLook Preview | Press Space to preview files |
-
-## Download
-
-Download the latest release from [Releases](https://github.com/AUG-Met/Clipz/releases).
-
-> Clipboard history is stored at `%APPDATA%\com.clipz.app\clipboard.db`. Please back up important data before uninstalling.
+[Download](https://github.com/AUG-Met/Clipz/releases) | [中文版](README.md)
 
 ## Development
 
-- **Frontend**: React + TypeScript + Vite
-- **Backend**: Rust + Tauri v2
-- **Build Tools**: Node.js 20+, Rust 1.77+, MSVC Build Tools
-
-### Local Development
-
 ```bash
-# Install frontend dependencies
 npm install
-
-# Start development mode (hot reload)
-npm run tauri dev
-
-# Build for production
-npm run tauri build
+npm run tauri dev    # dev mode
+npm run tauri build  # build
 ```
 
-## Tech Stack
+**Stack**: React 18 + TypeScript + Vite / Rust + Tauri v2 / SQLite
 
-- **Frontend**: React 18, TypeScript, Vite
-- **Backend**: Rust, Tauri v2
-- **Database**: SQLite (rusqlite)
-- **Clipboard**: arboard (text/image), clipboard-win (file CF_HDROP)
-- **Keyboard**: rdev (global keyboard listener)
-- **Theme**: CSS variables + Windows DwmSetWindowAttribute / SetWindowTheme
-
-## Author
-
-- **AUG-Met** — [GitHub](https://github.com/AUG-Met)
+**Author**: [AUG-Met](https://github.com/AUG-Met)
